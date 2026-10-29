@@ -1,15 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/services/auth_service.dart';
-
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
-
-final authStateChangesProvider = StreamProvider<User?>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.authStateChanges();
-});
+import '../providers/auth_provider.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -22,13 +14,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isLogin = true;
   bool _isSubmitting = false;
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
@@ -36,38 +27,46 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    UserCredential? result;
-    if (_isLogin) {
-      result = await authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } else {
-      result = await authService.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    }
+    final result = _isLogin
+        ? await authService.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          )
+        : await authService.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
 
     if (!mounted) return;
 
     if (result == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Authentication failed. Please check your details and try again.'),
+          content: Text('Authentication failed. Please check your details.'),
         ),
       );
       setState(() => _isSubmitting = false);
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isLogin ? 'Welcome back!' : 'Account created successfully!',
+    setState(() => _isSubmitting = false);
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isSubmitting = true);
+
+    final authService = ref.read(authServiceProvider);
+    final result = await authService.signInWithGoogle();
+
+    if (!mounted) return;
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google sign-in was cancelled or failed.'),
         ),
-      ),
-    );
+      );
+    }
 
     setState(() => _isSubmitting = false);
   }
@@ -95,13 +94,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Entrepreneurship Coach',
+                      'Gladstar Leaders',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Sign in to continue your coaching journey.',
+                      'Your entrepreneurship and leadership coach',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),
@@ -145,12 +147,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ElevatedButton(
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
+                          ? const CircularProgressIndicator(strokeWidth: 2)
                           : Text(_isLogin ? 'Sign In' : 'Create Account'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isSubmitting ? null : _signInWithGoogle,
+                      icon: const Icon(Icons.g_mobiledata),
+                      label: const Text('Continue with Google'),
                     ),
                     const SizedBox(height: 12),
                     TextButton(

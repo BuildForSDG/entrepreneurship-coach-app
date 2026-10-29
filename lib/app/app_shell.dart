@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/auth/providers/auth_provider.dart';
-import '../../features/auth/screens/auth_screen.dart';
-import '../../features/coaching/screens/ai_coach_screen.dart';
-import '../../features/coaching/screens/business_plan_screen.dart';
-import '../../features/coaching/screens/daily_action_screen.dart';
-import '../../features/coaching/screens/dashboard_screen.dart';
-import '../../features/coaching/screens/goals_screen.dart';
-import '../../features/coaching/screens/leadership_plan_screen.dart';
-import '../../features/coaching/screens/onboarding_screen.dart';
-import '../../features/coaching/screens/progress_screen.dart';
-import '../../features/coaching/screens/weekly_challenge_screen.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../features/auth/screens/auth_screen.dart';
+import '../features/coaching/screens/ai_coach_screen.dart';
+import '../features/coaching/screens/business_plan_screen.dart';
+import '../features/coaching/screens/daily_action_screen.dart';
+import '../features/coaching/screens/dashboard_screen.dart';
+import '../features/coaching/screens/goals_screen.dart';
+import '../features/coaching/screens/leadership_plan_screen.dart';
+import '../features/coaching/screens/onboarding_screen.dart';
+import '../features/coaching/screens/progress_screen.dart';
+import '../features/coaching/screens/weekly_challenge_screen.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({super.key});
@@ -25,7 +25,6 @@ class AppShell extends ConsumerWidget {
         if (user == null) {
           return const AuthScreen();
         }
-
         return const CoachingNavigator();
       },
       loading: () => const Scaffold(
