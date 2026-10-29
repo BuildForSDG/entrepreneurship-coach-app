@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app_theme.dart';
 import 'app/app_shell.dart';
+import 'core/firebase/firebase_setup.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeFirebase();
+
   runApp(
     const ProviderScope(
       child: EntrepreneurshipCoachApp(),
