@@ -1,23 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/coaching/screens/ai_coach_screen.dart';
-import '../features/coaching/screens/business_plan_screen.dart';
-import '../features/coaching/screens/daily_action_screen.dart';
-import '../features/coaching/screens/dashboard_screen.dart';
-import '../features/coaching/screens/goals_screen.dart';
-import '../features/coaching/screens/leadership_plan_screen.dart';
-import '../features/coaching/screens/onboarding_screen.dart';
-import '../features/coaching/screens/progress_screen.dart';
-import '../features/coaching/screens/weekly_challenge_screen.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/screens/auth_screen.dart';
+import '../../features/coaching/screens/ai_coach_screen.dart';
+import '../../features/coaching/screens/business_plan_screen.dart';
+import '../../features/coaching/screens/daily_action_screen.dart';
+import '../../features/coaching/screens/dashboard_screen.dart';
+import '../../features/coaching/screens/goals_screen.dart';
+import '../../features/coaching/screens/leadership_plan_screen.dart';
+import '../../features/coaching/screens/onboarding_screen.dart';
+import '../../features/coaching/screens/progress_screen.dart';
+import '../../features/coaching/screens/weekly_challenge_screen.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateChangesProvider);
+
+    return authState.when(
+      data: (user) {
+        if (user == null) {
+          return const AuthScreen();
+        }
+
+        return const CoachingNavigator();
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(
+          child: Text('Authentication error: $error'),
+        ),
+      ),
+    );
+  }
 }
 
-class _AppShellState extends State<AppShell> {
+class CoachingNavigator extends StatefulWidget {
+  const CoachingNavigator({super.key});
+
+  @override
+  State<CoachingNavigator> createState() => _CoachingNavigatorState();
+}
+
+class _CoachingNavigatorState extends State<CoachingNavigator> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
