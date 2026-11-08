@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "577226197092",
+    "project_id": "gen-lang-client-0211371264",
+    "storage_bucket": "gen-lang-client-0211371264.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:577226197092:android:a5d04ffbb3778f9f15b771",
+        "android_client_info": {
+          "package_name": "com.gladstargtschool6.investlearn"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "577226197092-o18fsp1tl845vo53acsf3n3otakbcmti.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtyfzmE3riCZefnG3KTlbPYUcvQRXKbqw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "577226197092-o18fsp1tl845vo53acsf3n3otakbcmti.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
