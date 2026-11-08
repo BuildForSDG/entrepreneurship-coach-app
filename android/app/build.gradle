@@ -28,9 +28,9 @@ android {
     defaultConfig {
         applicationId = 'com.gladstargtschool6.investlearn'
         minSdk = 23
-        targetSdk = 36 flutter.targetSdkVersion
-        versionCode = 3 flutter.versionCode
-        versionName = 1.0 flutter.versionName
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     signingConfigs {
