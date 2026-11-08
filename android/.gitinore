@@ -1,0 +1,5 @@
+# Local SDK paths and signing materials must not be committed.
+local.properties
+key.properties
+*.jks
+*.keystore
