@@ -22,16 +22,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14.3'
 
       - name: Validate signing and Firebase secrets
         env:
@@ -41,6 +39,7 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          set -euo pipefail
           for name in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD STORE_PASSWORD GOOGLE_SERVICES_JSON; do
             if [ -z "${!name}" ]; then
               echo "Missing required repository secret: $name" >&2
@@ -48,7 +47,7 @@ jobs:
             fi
           done
 
-      - name: Configure Android signing and Firebase
+      - name: Configure Android signing, Firebase, and Flutter settings
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -56,23 +55,38 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          set -euo pipefail
+
+          mkdir -p android/app
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           storePassword=$STORE_PASSWORD
           EOF
+
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
+          export FLUTTER_SDK="$(dirname "$(dirname "$(which flutter)")")"
+
+          flutter config --android-sdk "$ANDROID_SDK_ROOT"
+
           cat > android/local.properties <<EOF
-          flutter.sdk=$FLUTTER_ROOT
+          flutter.sdk=$FLUTTER_SDK
           sdk.dir=$ANDROID_SDK_ROOT
           EOF
+
+          test -d "$ANDROID_SDK_ROOT"
+          test -f android/app/google-services.json
 
       - name: Generate Gradle wrapper
         run: |
           cd android
-          gradle wrapper --gradle-version 8.14.3 --distribution-type all
+          if [ ! -x ./gradlew ]; then
+            gradle wrapper --gradle-version 8.14.3 --distribution-type all
+          fi
           chmod +x gradlew
 
       - name: Resolve packages and build signed AAB
