@@ -1,9 +1,8 @@
-import 'package:firebase_core/firebase_core.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Natively reads android/app/google-services.json without DefaultFirebaseOptions
+  await Firebase.initializeApp();
 
-class DefaultFirebaseOptions {
-  static FirebaseOptions get currentPlatform {
-    throw UnsupportedError(
-      'Firebase is not configured. Run `flutterfire configure` to generate the proper Firebase options for this project.',
-    );
-  }
+  runApp(const MyApp());
 }
