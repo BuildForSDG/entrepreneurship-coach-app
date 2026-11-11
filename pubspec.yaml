@@ -9,6 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # Add this line:
+  google_sign_in: ^6.2.2
+
+  # Your other dependencies (firebase_core, firebase_auth, etc.)
+  firebase_core: ^3.12.0
+  firebase_auth: ^5.5.1
   flutter_riverpod: ^2.5.1
   firebase_core: ^3.1.0
   firebase_auth: ^5.1.0
