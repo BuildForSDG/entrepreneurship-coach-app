@@ -47,3 +47,5 @@ class AppTheme {
     );
   }
 }
+// Add this at the bottom of lib/app/app_theme.dart:
+final ThemeData appTheme = AppTheme.lightTheme;
