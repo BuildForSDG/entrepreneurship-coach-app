@@ -1,3 +1,4 @@
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
@@ -8,18 +9,13 @@ Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
     if (kDebugMode) {
       debugPrint('Firebase initialized successfully.');
     }
-  } on UnsupportedError {
-    if (kDebugMode) {
-      debugPrint(
-        'Firebase config is not generated yet. Run `flutterfire configure` and then restart the app.',
-      );
-    }
-  } catch (error) {
-    if (kDebugMode) {
-      debugPrint('Firebase initialization failed: $error');
-    }
+  } catch (error, stackTrace) {
+    debugPrint('Firebase initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    rethrow;
   }
 }
