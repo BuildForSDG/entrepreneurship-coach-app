@@ -1,34 +1,49 @@
 import 'package:flutter/material.dart';
 
-final ThemeData appTheme = ThemeData(
-  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E3A8A)),
-  scaffoldBackgroundColor: const Color(0xFFF5F7FB),
-  appBarTheme: const AppBarTheme(
-    backgroundColor: Color(0xFF1E3A8A),
-    foregroundColor: Colors.white,
-    elevation: 0,
-  ),
-  cardTheme: CardTheme(
-    elevation: 2,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-  ),
-  elevatedButtonTheme: ElevatedButtonThemeData(
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF1E3A8A),
-      foregroundColor: Colors.white,
-      minimumSize: const Size.fromHeight(48),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+class AppTheme {
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.blue,
+        brightness: Brightness.light,
       ),
-    ),
-  ),
-  inputDecorationTheme: InputDecorationTheme(
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    filled: true,
-    fillColor: Colors.white,
-  ),
-);
+      scaffoldBackgroundColor: Colors.white,
+
+      // --- Fixed CardThemeData here ---
+      cardTheme: CardThemeData(
+        elevation: 2,
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 0,
+      ),
+    );
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.blue,
+        brightness: Brightness.dark,
+      ),
+
+      // --- Dark Theme CardThemeData ---
+      cardTheme: CardThemeData(
+        elevation: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
