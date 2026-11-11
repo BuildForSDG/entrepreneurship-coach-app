@@ -1,18 +1,25 @@
+import java.util.Properties
+
 pluginManagement {
-    def properties = new Properties()
-    def localProperties = file("local.properties")
+    val properties = Properties()
+    val localProperties = file("local.properties")
     if (!localProperties.exists()) {
-        throw new GradleException("android/local.properties is missing. Run Flutter tooling or set flutter.sdk and sdk.dir.")
+        throw GradleException("android/local.properties is missing. Run Flutter tooling or set flutter.sdk and sdk.dir.")
     }
-    localProperties.withInputStream { properties.load(it) }
-    def flutterSdkPath = properties.getProperty("flutter.sdk")
-    if (flutterSdkPath == null || flutterSdkPath.trim().isEmpty()) {
-        throw new GradleException("flutter.sdk is missing from android/local.properties")
+
+    // Read local.properties using Kotlin's inputStream extension
+    localProperties.inputStream().use { properties.load(it) }
+
+    val flutterSdkPath = properties.getProperty("flutter.sdk")
+    if (flutterSdkPath.isNullOrBlank()) {
+        throw GradleException("flutter.sdk is missing from android/local.properties")
     }
-    def flutterGradleBuild = file("${flutterSdkPath}/packages/flutter_tools/gradle")
-    if (!flutterGradleBuild.isDirectory()) {
-        throw new GradleException("Flutter Gradle plugin not found at ${flutterGradleBuild}. Correct flutter.sdk or reinstall Flutter.")
+
+    val flutterGradleBuild = file("$flutterSdkPath/packages/flutter_tools/gradle")
+    if (!flutterGradleBuild.isDirectory) {
+        throw GradleException("Flutter Gradle plugin not found at $flutterGradleBuild. Correct flutter.sdk or reinstall Flutter.")
     }
+
     includeBuild(flutterGradleBuild)
 
     repositories {
