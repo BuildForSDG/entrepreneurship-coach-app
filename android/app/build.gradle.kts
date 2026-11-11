@@ -1,3 +1,4 @@
+
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -10,8 +11,11 @@ plugins {
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
+
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    FileInputStream(keystorePropertiesFile).use {
+        keystoreProperties.load(it)
+    }
 }
 
 android {
@@ -39,26 +43,34 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                val storeFileProp = keystoreProperties.getProperty("storeFile")
-                if (storeFileProp != null) {
-                    storeFile = file(storeFileProp)
-                }
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storePassword = keystoreProperties.getProperty("storePassword")
+                val storeFilePath =
+                    keystoreProperties.getProperty("storeFile")
+                        ?: error("Missing storeFile in key.properties")
+
+                keyAlias =
+                    keystoreProperties.getProperty("keyAlias")
+                        ?: error("Missing keyAlias in key.properties")
+
+                keyPassword =
+                    keystoreProperties.getProperty("keyPassword")
+                        ?: error("Missing keyPassword in key.properties")
+
+                storePassword =
+                    keystoreProperties.getProperty("storePassword")
+                        ?: error("Missing storePassword in key.properties")
+
+                storeFile = file(storeFilePath)
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
+
             isMinifyEnabled = true
             isShrinkResources = true
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
