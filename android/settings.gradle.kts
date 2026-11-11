@@ -1,3 +1,4 @@
+
 pluginManagement {
     val flutterSdkPath = run {
         val properties = java.util.Properties()
@@ -26,11 +27,11 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
 
-    // Keep your existing compatible AGP version here.
     id("com.android.application") version "8.13.0" apply false
 
-    // Keep your existing Kotlin version here.
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+
+    id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
 include(":app")
