@@ -12,16 +12,20 @@ jobs:
   build:
     name: Build signed release AAB
     runs-on: ubuntu-latest
+
     steps:
+      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Install Java 17
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Install Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -29,29 +33,39 @@ jobs:
 
       - name: Install Android SDK packages
         shell: bash
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          set -euxo pipefail
+          set -euo pipefail
 
-          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
-          yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null || true
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+
+          yes | sdkmanager --sdk_root="$SDK" --licenses >/dev/null || true
+
+          sdkmanager --sdk_root="$SDK" \
             "cmdline-tools;latest" \
             "platform-tools" \
             "platforms;android-35" \
-            "build-tools;35.0.0"
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0"
 
+      # 4. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
+      - name: Check Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      # 5. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
+        shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
@@ -60,14 +74,25 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           set -euo pipefail
-          for name in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD STORE_PASSWORD GOOGLE_SERVICES_JSON; do
+
+          for name in \
+            KEYSTORE_BASE64 \
+            KEY_ALIAS \
+            KEY_PASSWORD \
+            STORE_PASSWORD \
+            GOOGLE_SERVICES_JSON
+          do
             if [ -z "${!name}" ]; then
-              echo "Missing required repository secret: $name" >&2
+              echo "Missing required secret: $name" >&2
               exit 1
             fi
           done
 
-      - name: Configure Android signing, Firebase, and Flutter settings
+          echo "All required secrets are available."
+
+      # 6. Configure signing and Firebase
+      - name: Configure Android signing and Firebase
+        shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.KEY_ALIAS }}
@@ -78,9 +103,47 @@ jobs:
           set -euo pipefail
 
           mkdir -p android/app
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
+          # Decode Android keystore
+          printf '%s' "$KEYSTORE_BASE64" \
+            | base64 --decode > android/app/upload-keystore.jks
+
+          test -s android/app/upload-keystore.jks
+
+          # Verify keystore and alias
+          keytool -list \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          echo "Keystore and key alias verified."
+
+          # Create Firebase configuration
+          printf '%s' "$GOOGLE_SERVICES_JSON" \
+            > android/app/google-services.json
+
+          # Verify Firebase package name
+          python3 -c '
+          import json
+          path = "android/app/google-services.json"
+          with open(path) as f:
+              data = json.load(f)
+
+          expected = "com.gladstargtschool6.investlearn"
+          clients = data.get("client", [])
+
+          if not any(
+              c.get("client_info", {})
+               .get("android_client_info", {})
+               .get("package_name") == expected
+              for c in clients
+          ):
+              raise SystemExit("Firebase package name mismatch")
+
+          print("Firebase package name verified.")
+          '
+
+          # Generate key.properties
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
@@ -88,8 +151,9 @@ jobs:
           storePassword=$STORE_PASSWORD
           EOF
 
-          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
-          export FLUTTER_SDK="$(dirname "$(dirname "$(which flutter)")")"
+          # Configure Flutter SDK
+          ANDROID_SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          FLUTTER_SDK="$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")"
 
           flutter config --android-sdk "$ANDROID_SDK_ROOT"
 
@@ -98,31 +162,65 @@ jobs:
           sdk.dir=$ANDROID_SDK_ROOT
           EOF
 
-          test -d "$ANDROID_SDK_ROOT"
+          test -f android/key.properties
+          test -f android/local.properties
           test -f android/app/google-services.json
 
+          echo "Android signing and Firebase configuration completed."
+
+      # 7. Set up Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
 
+      # 8. Generate Gradle wrapper
       - name: Generate Gradle wrapper
+        shell: bash
         run: |
+          set -euo pipefail
+
           cd android
-          if [ ! -x ./gradlew ]; then
-            gradle wrapper --gradle-version 8.14.3 --distribution-type all
+
+          if [ ! -f gradlew ]; then
+            gradle wrapper \
+              --gradle-version 8.14.3 \
+              --distribution-type all
           fi
+
           chmod +x gradlew
 
-      - name: Resolve packages and build signed AAB
-        run: |
-          flutter pub get
-          flutter build appbundle --release
+          ./gradlew --version
 
+      # 9. Resolve Flutter dependencies
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      # 10. Build signed release AAB
+      - name: Build signed Android App Bundle
+        run: |
+          flutter build appbundle \
+            --release \
+            --build-number=${{ github.run_number }}
+
+      # 11. Verify generated AAB
+      - name: Verify AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          AAB="build/app/outputs/bundle/release/app-release.aab"
+
+          test -s "$AAB"
+
+          echo "AAB successfully generated."
+          ls -lh "$AAB"
+
+      # 12. Upload AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: investlearn-release-aab
+          name: gladstar-gt-school-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
