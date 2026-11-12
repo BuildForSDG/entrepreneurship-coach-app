@@ -1,9 +1,6 @@
-
 import 'package:flutter/material.dart';
-
 import 'core/firebase/firebase_setup.dart';
-
-// Keep your existing MyApp import here.
+import 'app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
