@@ -2,6 +2,9 @@
 import java.util.Properties
 import java.io.FileInputStream
 
+import com.android.build.api.dsl.ApplicationExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -9,7 +12,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load Android signing properties
 val keystoreProperties = Properties()
+
 val keystorePropertiesFile = rootProject.file("key.properties")
 
 require(keystorePropertiesFile.exists()) {
@@ -20,7 +25,9 @@ FileInputStream(keystorePropertiesFile).use {
     keystoreProperties.load(it)
 }
 
-android {
+// Configure Android using the AGP 9 ApplicationExtension API
+extensions.configure<ApplicationExtension> {
+
     namespace = "com.gladstargtschool6.investlearn"
 
     compileSdk = flutter.compileSdkVersion
@@ -29,10 +36,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -68,8 +71,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig =
-                signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
 
             isMinifyEnabled = true
             isShrinkResources = true
@@ -84,6 +86,14 @@ android {
     }
 }
 
+// Configure Kotlin using the modern compilerOptions DSL
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// Flutter configuration
 flutter {
     source = "../.."
 }
