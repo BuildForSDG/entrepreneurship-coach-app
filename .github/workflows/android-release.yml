@@ -33,7 +33,7 @@ jobs:
         with:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
-          packages: 'platform-tools,platforms;android-35,platforms;android-36,build-tools;35.0.0,build-tools;36.0.0'
+          packages: 'platform-tools platforms;android-35 platforms;android-36 build-tools;35.0.0 build-tools;36.0.0'
 
       # 4. Install Flutter
       - name: Set up Flutter
@@ -49,7 +49,7 @@ jobs:
           flutter --version
           flutter doctor -v
 
-      # 6. Set up Gradle 9.3.1
+      # 6. Set up Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -60,16 +60,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p android
-
           cat > android/local.properties <<EOF
           flutter.sdk=$FLUTTER_ROOT
           sdk.dir=$ANDROID_HOME
           EOF
-
           test -s android/local.properties
-
           echo "Android local.properties configured."
 
       # 8. Resolve Flutter dependencies
@@ -88,13 +84,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in \
-            KEYSTORE_BASE64 \
-            KEY_ALIAS \
-            KEY_PASSWORD \
-            STORE_PASSWORD \
-            GOOGLE_SERVICES_JSON
-          do
+          for name in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD STORE_PASSWORD GOOGLE_SERVICES_JSON; do
             if [ -z "${!name}" ]; then
               echo "Missing required secret: $name" >&2
               exit 1
@@ -117,13 +107,9 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode existing upload keystore
-          printf '%s' "$KEYSTORE_BASE64" \
-            | base64 --decode > android/app/upload-keystore.jks
-
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
           test -s android/app/upload-keystore.jks
 
-          # Verify keystore and alias
           keytool -list \
             -keystore android/app/upload-keystore.jks \
             -storepass "$STORE_PASSWORD" \
@@ -131,9 +117,7 @@ jobs:
 
           echo "Keystore verified."
 
-          # Configure Firebase
-          printf '%s' "$GOOGLE_SERVICES_JSON" \
-            > android/app/google-services.json
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
           python3 -c '
           import json
@@ -144,7 +128,6 @@ jobs:
               data = json.load(f)
 
           expected = "com.gladstargtschool6.investlearn"
-
           clients = data.get("client", [])
 
           if not any(
@@ -158,7 +141,6 @@ jobs:
           print("Firebase configuration verified.")
           '
 
-          # Generate signing properties
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
@@ -167,17 +149,15 @@ jobs:
           EOF
 
           test -s android/key.properties
-
           echo "Signing configuration completed."
 
-      # 11. Generate Gradle wrapper
+      # 11. Generate Gradle Wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
           set -euo pipefail
 
           cd android
-
           mkdir -p gradle/wrapper
 
           cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
@@ -190,12 +170,8 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-          gradle wrapper \
-            --gradle-version 9.3.1 \
-            --distribution-type all
-
+          gradle wrapper --gradle-version 9.3.1 --distribution-type all
           chmod +x gradlew
-
           ./gradlew --version
 
       # 12. Build signed Android App Bundle
@@ -222,7 +198,6 @@ jobs:
           fi
 
           echo "AAB successfully generated."
-
           ls -lh "$AAB"
 
           jarsigner -verify "$AAB"
