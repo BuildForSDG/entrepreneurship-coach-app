@@ -44,3 +44,4 @@ This project is prepared for Firebase integration using:
 - Cloud Firestore
 
 The generated Firebase config files will be created by the FlutterFire CLI automatically. 
+[![.github/workflows/android-release.yml](https://github.com/BuildForSDG/entrepreneurship-coach-app/actions/workflows/android-release.yml/badge.svg?branch=main)](https://github.com/BuildForSDG/entrepreneurship-coach-app/actions/workflows/android-release.yml)
