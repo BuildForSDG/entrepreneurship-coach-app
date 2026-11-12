@@ -1,9 +1,11 @@
+
 name: Build signed Android App Bundle
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -14,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,8 +31,6 @@ jobs:
       # 3. Install Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
 
       - name: Install Android SDK packages
         shell: bash
@@ -38,8 +39,8 @@ jobs:
 
           SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
           yes | sdkmanager --sdk_root="$SDK" --licenses >/dev/null || true
 
@@ -55,7 +56,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Check Flutter installation
@@ -63,7 +64,32 @@ jobs:
           flutter --version
           flutter doctor -v
 
-      # 5. Validate GitHub secrets
+      # 5. Set up Gradle 9.3.1
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      # 6. Configure Flutter SDK
+      - name: Configure Android local properties
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p android
+
+          cat > android/local.properties <<EOF
+          flutter.sdk=$FLUTTER_ROOT
+          sdk.dir=$ANDROID_HOME
+          EOF
+
+          test -f android/local.properties
+
+      # 7. Resolve Flutter dependencies
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      # 8. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -90,7 +116,7 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 6. Configure signing and Firebase
+      # 9. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -104,7 +130,7 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode Android keystore
+          # Decode keystore
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode > android/app/upload-keystore.jks
 
@@ -116,20 +142,22 @@ jobs:
             -storepass "$STORE_PASSWORD" \
             -alias "$KEY_ALIAS" >/dev/null
 
-          echo "Keystore and key alias verified."
+          echo "Keystore verified."
 
-          # Create Firebase configuration
+          # Configure Firebase
           printf '%s' "$GOOGLE_SERVICES_JSON" \
             > android/app/google-services.json
 
-          # Verify Firebase package name
           python3 -c '
           import json
+
           path = "android/app/google-services.json"
+
           with open(path) as f:
               data = json.load(f)
 
           expected = "com.gladstargtschool6.investlearn"
+
           clients = data.get("client", [])
 
           if not any(
@@ -140,10 +168,10 @@ jobs:
           ):
               raise SystemExit("Firebase package name mismatch")
 
-          print("Firebase package name verified.")
+          print("Firebase configuration verified.")
           '
 
-          # Generate key.properties
+          # Generate signing properties
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
@@ -151,55 +179,48 @@ jobs:
           storePassword=$STORE_PASSWORD
           EOF
 
-          # Configure Flutter SDK
-          ANDROID_SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          FLUTTER_SDK="$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")"
+          test -s android/key.properties
 
-          flutter config --android-sdk "$ANDROID_SDK_ROOT"
+          echo "Signing configuration completed."
 
-          cat > android/local.properties <<EOF
-          flutter.sdk=$FLUTTER_SDK
-          sdk.dir=$ANDROID_SDK_ROOT
+      # 10. Generate Gradle wrapper
+      - name: Generate Gradle Wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd android
+
+          mkdir -p gradle/wrapper
+
+          # Set required wrapper version before Gradle configuration
+          cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-all.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
           EOF
 
-          test -f android/key.properties
-          test -f android/local.properties
-          test -f android/app/google-services.json
+          # Generate wrapper scripts
+          gradle wrapper \
+            --gradle-version 9.3.1 \
+            --distribution-type all
 
-          echo "Android signing and Firebase configuration completed."
+          chmod +x gradlew
 
-      # 7. Set up Gradle
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14.3'
+          ./gradlew --version
 
-      # 8. Generate Gradle wrapper
-    - name: Set up Gradle Wrapper
-  run: |
-    set -euo pipefail
-
-    cd android
-
-    sed -i 's/gradle-[0-9.]*-all.zip/gradle-9.3.1-all.zip/' \
-      gradle/wrapper/gradle-wrapper.properties
-
-    chmod +x gradlew
-
-    ./gradlew --version
-
-      # 9. Resolve Flutter dependencies
-      - name: Resolve Flutter dependencies
-        run: flutter pub get
-
-      # 10. Build signed release AAB
+      # 11. Build signed Android App Bundle
       - name: Build signed Android App Bundle
         run: |
           flutter build appbundle \
             --release \
             --build-number=${{ github.run_number }}
 
-      # 11. Verify generated AAB
+      # 12. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -210,9 +231,14 @@ jobs:
           test -s "$AAB"
 
           echo "AAB successfully generated."
+
           ls -lh "$AAB"
 
-      # 12. Upload AAB
+          jarsigner -verify "$AAB"
+
+          echo "AAB signature verification completed."
+
+      # 13. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
