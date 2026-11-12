@@ -24,13 +24,8 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
 
-    // Android Gradle Plugin
     id("com.android.application") version "9.3.1" apply false
 
-    // Kotlin Gradle Plugin
-    id("org.jetbrains.kotlin.android") version "2.4.20" apply false
-
-    // Google Services
     id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
