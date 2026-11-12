@@ -9,6 +9,5 @@ Configure these repository secrets in **Settings → Secrets and variables → A
 - `ANDROID_KEY_PASSWORD`: key password
 - `ANDROID_STORE_PASSWORD`: keystore password
 - `GOOGLE_SERVICES_JSON`: Firebase Android configuration for `com.gladstargtschool6.investlearn`
-- `FIREBASE_OPTIONS_DART`: generated `lib/firebase_options.dart` contents
 
 Do not commit the keystore or signing passwords, or post them in chat. Generate and encode a keystore locally, then add the Base64 output directly as a GitHub secret. The workflow generates the Gradle wrapper on the runner and configures the Flutter SDK path from the installed Flutter action.
