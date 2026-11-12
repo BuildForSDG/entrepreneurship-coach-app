@@ -27,7 +27,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 3. Set up Android SDK and accept licences
+      # 3. Install Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -43,36 +43,88 @@ jobs:
           channel: stable
           cache: true
 
-      # 5. Verify Flutter installation
+      # 5. Verify Flutter
       - name: Check Flutter installation
         run: |
           flutter --version
           flutter doctor -v
 
-      # 6. Set up Gradle
+      # 6. Install Gradle 9.5.0
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.3.1'
+          gradle-version: '9.5.0'
 
-      # 7. Configure Flutter and Android SDK paths
+      # 7. Configure Android local properties
       - name: Configure Android local properties
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p android
+
           cat > android/local.properties <<EOF
           flutter.sdk=$FLUTTER_ROOT
           sdk.dir=$ANDROID_HOME
           EOF
-          test -s android/local.properties
-          echo "Android local.properties configured."
 
-      # 8. Resolve Flutter dependencies
+          test -s android/local.properties
+          echo "Android local properties configured."
+
+      # 8. Update Android Gradle Plugin and Kotlin versions
+      - name: Update Android Gradle configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SETTINGS="android/settings.gradle.kts"
+          PROPERTIES="android/gradle.properties"
+
+          test -f "$SETTINGS"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/settings.gradle.kts")
+          content = path.read_text()
+
+          replacements = {
+              'version "8.13.0"': 'version "9.3.1"',
+              'version "2.3.20"': 'version "2.4.20"',
+          }
+
+          for old, new in replacements.items():
+              content = content.replace(old, new)
+
+          if 'id("com.android.application") version "9.3.1" apply false' not in content:
+              raise SystemExit("Could not verify Android Gradle Plugin 9.3.1")
+
+          if 'id("org.jetbrains.kotlin.android") version "2.4.20" apply false' not in content:
+              raise SystemExit("Could not verify Kotlin Gradle Plugin 2.4.20")
+
+          path.write_text(content)
+          print("AGP 9.3.1 and Kotlin 2.4.20 configured.")
+          PY
+
+          touch "$PROPERTIES"
+
+          grep -q '^android.builtInKotlin=' "$PROPERTIES" || \
+            echo 'android.builtInKotlin=false' >> "$PROPERTIES"
+
+          grep -q '^android.newDsl=' "$PROPERTIES" || \
+            echo 'android.newDsl=false' >> "$PROPERTIES"
+
+          echo "Legacy Kotlin and Android DSL compatibility flags configured."
+
+          echo "Current Android Gradle configuration:"
+          grep -E 'com.android.application|org.jetbrains.kotlin.android' "$SETTINGS"
+          grep -E '^android\.(builtInKotlin|newDsl)=' "$PROPERTIES"
+
+      # 9. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 9. Validate GitHub secrets
+      # 10. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -93,7 +145,7 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 10. Configure Android signing and Firebase
+      # 11. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -107,7 +159,9 @@ jobs:
 
           mkdir -p android/app
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode \
+            > android/app/upload-keystore.jks
+
           test -s android/app/upload-keystore.jks
 
           keytool -list \
@@ -117,9 +171,10 @@ jobs:
 
           echo "Keystore verified."
 
-          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          printf '%s' "$GOOGLE_SERVICES_JSON" \
+            > android/app/google-services.json
 
-          python3 -c '
+          python3 - <<'PY'
           import json
 
           path = "android/app/google-services.json"
@@ -128,18 +183,21 @@ jobs:
               data = json.load(f)
 
           expected = "com.gladstargtschool6.investlearn"
+
           clients = data.get("client", [])
 
-          if not any(
+          valid = any(
               c.get("client_info", {})
                .get("android_client_info", {})
                .get("package_name") == expected
               for c in clients
-          ):
+          )
+
+          if not valid:
               raise SystemExit("Firebase package name mismatch")
 
           print("Firebase configuration verified.")
-          '
+          PY
 
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
@@ -149,32 +207,38 @@ jobs:
           EOF
 
           test -s android/key.properties
+
           echo "Signing configuration completed."
 
-      # 11. Generate Gradle Wrapper
+      # 12. Generate Gradle 9.5.0 wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
           set -euo pipefail
 
           cd android
+
           mkdir -p gradle/wrapper
 
           cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-all.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.0-all.zip
           networkTimeout=10000
           validateDistributionUrl=true
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           EOF
 
-          gradle wrapper --gradle-version 9.3.1 --distribution-type all
+          gradle wrapper \
+            --gradle-version 9.5.0 \
+            --distribution-type all
+
           chmod +x gradlew
+
           ./gradlew --version
 
-      # 12. Build signed Android App Bundle
+      # 13. Build signed Android App Bundle
       - name: Build signed Android App Bundle
         shell: bash
         run: |
@@ -184,7 +248,7 @@ jobs:
             --release \
             --build-number=${{ github.run_number }}
 
-      # 13. Verify generated AAB
+      # 14. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -198,13 +262,14 @@ jobs:
           fi
 
           echo "AAB successfully generated."
+
           ls -lh "$AAB"
 
           jarsigner -verify "$AAB"
 
           echo "AAB signature verification completed."
 
-      # 14. Upload signed AAB
+      # 15. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
