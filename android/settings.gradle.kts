@@ -2,7 +2,13 @@
 pluginManagement {
     val flutterSdkPath = run {
         val properties = java.util.Properties()
-        file("local.properties").inputStream().use {
+        val localPropertiesFile = file("local.properties")
+
+        require(localPropertiesFile.exists()) {
+            "android/local.properties is missing. Run flutter pub get first."
+        }
+
+        localPropertiesFile.inputStream().use {
             properties.load(it)
         }
 
