@@ -175,15 +175,14 @@ jobs:
           gradle-version: '8.14.3'
 
       # 8. Generate Gradle wrapper
-      - name: Generate Gradle wrapper
-   run: |
+    - name: Set up Gradle Wrapper
+  run: |
     set -euo pipefail
 
     cd android
 
-    gradle wrapper \
-      --gradle-version 9.3.1 \
-      --distribution-type all
+    sed -i 's/gradle-[0-9.]*-all.zip/gradle-9.3.1-all.zip/' \
+      gradle/wrapper/gradle-wrapper.properties
 
     chmod +x gradlew
 
