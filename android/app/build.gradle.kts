@@ -7,12 +7,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
 
-// Load Android signing properties
+// Load signing properties
 val keystoreProperties = Properties()
 
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -25,7 +24,7 @@ FileInputStream(keystorePropertiesFile).use {
     keystoreProperties.load(it)
 }
 
-// Configure Android using the AGP 9 ApplicationExtension API
+// Android configuration
 extensions.configure<ApplicationExtension> {
 
     namespace = "com.gladstargtschool6.investlearn"
@@ -86,7 +85,7 @@ extensions.configure<ApplicationExtension> {
     }
 }
 
-// Configure Kotlin using the modern compilerOptions DSL
+// AGP 9 built-in Kotlin compiler configuration
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
