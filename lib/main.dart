@@ -1,30 +1,14 @@
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'app/app_theme.dart';
-import 'app/app_shell.dart';
+
 import 'core/firebase/firebase_setup.dart';
+
+// Keep your existing MyApp import here.
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await initializeFirebase();
 
-  runApp(
-    const ProviderScope(
-      child: EntrepreneurshipCoachApp(),
-    ),
-  );
-}
-
-class EntrepreneurshipCoachApp extends StatelessWidget {
-  const EntrepreneurshipCoachApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Entrepreneurship Coach',
-      debugShowCheckedModeBanner: false,
-      theme: appTheme,
-      home: const AppShell(),
-    );
-  }
+  runApp(const MyApp());
 }
