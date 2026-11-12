@@ -16,18 +16,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Install Java 17
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Install Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -35,7 +32,6 @@ jobs:
           log-accepted-android-sdk-licenses: false
           packages: 'platform-tools platforms;android-35 platforms;android-36 build-tools;35.0.0 build-tools;36.0.0'
 
-      # 4. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -43,24 +39,20 @@ jobs:
           channel: stable
           cache: true
 
-      # 5. Verify Flutter
       - name: Check Flutter installation
         run: |
           flutter --version
           flutter doctor -v
 
-      # 6. Install Gradle 9.5.0
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
 
-      # 7. Configure Android local properties
       - name: Configure Android local properties
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p android
 
           cat > android/local.properties <<EOF
@@ -71,7 +63,6 @@ jobs:
           test -s android/local.properties
           echo "Android local properties configured."
 
-      # 8. Update Android Gradle Plugin and Kotlin versions
       - name: Update Android Gradle configuration
         shell: bash
         run: |
@@ -81,50 +72,64 @@ jobs:
           PROPERTIES="android/gradle.properties"
 
           test -f "$SETTINGS"
+          touch "$PROPERTIES"
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("android/settings.gradle.kts")
           content = path.read_text()
 
-          replacements = {
-              'version "8.13.0"': 'version "9.3.1"',
-              'version "2.3.20"': 'version "2.4.20"',
-          }
+          # Set Android Gradle Plugin version.
+          content, count = re.subn(
+              r'(id\("com\.android\.application"\)\s+version\s+")[^"]+(")',
+              r'\g<1>9.3.1\g<2>',
+              content,
+              count=1
+          )
 
-          for old, new in replacements.items():
-              content = content.replace(old, new)
+          if count != 1:
+              raise SystemExit(
+                  "Could not update AGP version. "
+                  "Check android/settings.gradle.kts."
+              )
+
+          # Remove external Kotlin plugin declaration.
+          content = re.sub(
+              r'^\s*id\("org\.jetbrains\.kotlin\.android"\).*?\n',
+              '',
+              content,
+              flags=re.MULTILINE
+          )
 
           if 'id("com.android.application") version "9.3.1" apply false' not in content:
-              raise SystemExit("Could not verify Android Gradle Plugin 9.3.1")
+              raise SystemExit("AGP 9.3.1 configuration not found.")
 
-          if 'id("org.jetbrains.kotlin.android") version "2.4.20" apply false' not in content:
-              raise SystemExit("Could not verify Kotlin Gradle Plugin 2.4.20")
+          if "org.jetbrains.kotlin.android" in content:
+              raise SystemExit(
+                  "External Kotlin plugin declaration still exists."
+              )
 
           path.write_text(content)
-          print("AGP 9.3.1 and Kotlin 2.4.20 configured.")
+
+          print("AGP 9.3.1 verified.")
+          print("External Kotlin plugin declaration removed.")
           PY
 
-          touch "$PROPERTIES"
+          # Enable AGP built-in Kotlin.
+          sed -i '/^android\.builtInKotlin=/d' "$PROPERTIES"
+          sed -i '/^android\.newDsl=/d' "$PROPERTIES"
 
-          grep -q '^android.builtInKotlin=' "$PROPERTIES" || \
-            echo 'android.builtInKotlin=false' >> "$PROPERTIES"
+          echo 'android.builtInKotlin=true' >> "$PROPERTIES"
 
-          grep -q '^android.newDsl=' "$PROPERTIES" || \
-            echo 'android.newDsl=false' >> "$PROPERTIES"
+          echo "Android Gradle configuration:"
+          grep -E 'com.android.application|org.jetbrains.kotlin.android' "$SETTINGS" || true
+          cat "$PROPERTIES"
 
-          echo "Legacy Kotlin and Android DSL compatibility flags configured."
-
-          echo "Current Android Gradle configuration:"
-          grep -E 'com.android.application|org.jetbrains.kotlin.android' "$SETTINGS"
-          grep -E '^android\.(builtInKotlin|newDsl)=' "$PROPERTIES"
-
-      # 9. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 10. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -136,7 +141,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in KEYSTORE_BASE64 KEY_ALIAS KEY_PASSWORD STORE_PASSWORD GOOGLE_SERVICES_JSON; do
+          for name in \
+            KEYSTORE_BASE64 \
+            KEY_ALIAS \
+            KEY_PASSWORD \
+            STORE_PASSWORD \
+            GOOGLE_SERVICES_JSON
+          do
             if [ -z "${!name}" ]; then
               echo "Missing required secret: $name" >&2
               exit 1
@@ -145,7 +156,6 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 11. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -159,11 +169,13 @@ jobs:
 
           mkdir -p android/app
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode \
-            > android/app/upload-keystore.jks
+          # Decode existing Android keystore.
+          printf '%s' "$KEYSTORE_BASE64" \
+            | base64 --decode > android/app/upload-keystore.jks
 
           test -s android/app/upload-keystore.jks
 
+          # Verify the existing alias and store password.
           keytool -list \
             -keystore android/app/upload-keystore.jks \
             -storepass "$STORE_PASSWORD" \
@@ -171,9 +183,11 @@ jobs:
 
           echo "Keystore verified."
 
+          # Write Firebase configuration.
           printf '%s' "$GOOGLE_SERVICES_JSON" \
             > android/app/google-services.json
 
+          # Verify Firebase Android package name.
           python3 - <<'PY'
           import json
 
@@ -186,19 +200,18 @@ jobs:
 
           clients = data.get("client", [])
 
-          valid = any(
+          if not any(
               c.get("client_info", {})
                .get("android_client_info", {})
                .get("package_name") == expected
               for c in clients
-          )
-
-          if not valid:
-              raise SystemExit("Firebase package name mismatch")
+          ):
+              raise SystemExit("Firebase package name mismatch.")
 
           print("Firebase configuration verified.")
           PY
 
+          # Generate Android signing properties.
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
@@ -207,10 +220,8 @@ jobs:
           EOF
 
           test -s android/key.properties
-
           echo "Signing configuration completed."
 
-      # 12. Generate Gradle 9.5.0 wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
@@ -238,7 +249,28 @@ jobs:
 
           ./gradlew --version
 
-      # 13. Build signed Android App Bundle
+      - name: Check Android Gradle configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking Android Gradle files..."
+
+          test -f android/settings.gradle.kts
+          test -f android/app/build.gradle.kts
+          test -f android/gradle.properties
+
+          grep -q 'com.android.application' android/settings.gradle.kts
+
+          if grep -q 'org.jetbrains.kotlin.android' android/settings.gradle.kts; then
+            echo "External Kotlin plugin must be removed for this migration."
+            exit 1
+          fi
+
+          grep -q 'android.builtInKotlin=true' android/gradle.properties
+
+          echo "Basic Android Gradle checks passed."
+
       - name: Build signed Android App Bundle
         shell: bash
         run: |
@@ -248,7 +280,6 @@ jobs:
             --release \
             --build-number=${{ github.run_number }}
 
-      # 14. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -262,14 +293,12 @@ jobs:
           fi
 
           echo "AAB successfully generated."
-
           ls -lh "$AAB"
 
           jarsigner -verify "$AAB"
 
           echo "AAB signature verification completed."
 
-      # 15. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
