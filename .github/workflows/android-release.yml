@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,54 +27,58 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 3. Install Android SDK
-       - name: Install Android SDK packages
-  shell: bash
-  run: |
-    set -euo pipefail
+      # 3. Set up Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-    SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+      # 4. Install Android SDK packages and accept licences
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
 
-    echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-    echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
-    SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
-    if [ ! -x "$SDKMANAGER" ]; then
-      echo "Android SDK manager not found: $SDKMANAGER"
-      exit 1
-    fi
+          SDKMANAGER="$(command -v sdkmanager)"
 
-    echo "Accepting Android SDK licences..."
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            echo "Android SDK manager not found."
+            exit 1
+          fi
 
-    set +o pipefail
-    yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses
-    LICENSE_STATUS=${PIPESTATUS[1]}
-    set -o pipefail
+          echo "Accepting Android SDK licences..."
 
-    if [ "$LICENSE_STATUS" -ne 0 ]; then
-      echo "Android SDK licence acceptance failed."
-      exit 1
-    fi
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses
+          LICENSE_STATUS=${PIPESTATUS[1]}
+          set -o pipefail
 
-    echo "Installing Android SDK packages..."
+          if [ "$LICENSE_STATUS" -ne 0 ]; then
+            echo "Android SDK licence acceptance failed."
+            exit 1
+          fi
 
-    "$SDKMANAGER" --sdk_root="$SDK" \
-      "cmdline-tools;latest" \
-      "platform-tools" \
-      "platforms;android-35" \
-      "platforms;android-36" \
-      "build-tools;35.0.0" \
-      "build-tools;36.0.0"
+          echo "Installing Android SDK packages..."
 
-    echo "Android SDK installation completed."
+          "$SDKMANAGER" --sdk_root="$SDK" \
+            "cmdline-tools;latest" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0"
 
+          echo "Android SDK installation completed."
 
-      # 4. Install Flutter
+      # 5. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.50.0'
+          channel: stable
           cache: true
 
       - name: Check Flutter installation
@@ -83,13 +86,13 @@ jobs:
           flutter --version
           flutter doctor -v
 
-      # 5. Set up Gradle 9.3.1
+      # 6. Set up Gradle 9.3.1
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      # 6. Configure Flutter SDK
+      # 7. Configure Flutter and Android SDK paths
       - name: Configure Android local properties
         shell: bash
         run: |
@@ -102,13 +105,15 @@ jobs:
           sdk.dir=$ANDROID_HOME
           EOF
 
-          test -f android/local.properties
+          test -s android/local.properties
 
-      # 7. Resolve Flutter dependencies
+          echo "Android local.properties configured."
+
+      # 8. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 8. Validate GitHub secrets
+      # 9. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -135,7 +140,7 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 9. Configure Android signing and Firebase
+      # 10. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -149,7 +154,7 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode keystore
+          # Decode existing upload keystore
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode > android/app/upload-keystore.jks
 
@@ -202,7 +207,7 @@ jobs:
 
           echo "Signing configuration completed."
 
-      # 10. Generate Gradle wrapper
+      # 11. Generate Gradle wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
@@ -212,7 +217,6 @@ jobs:
 
           mkdir -p gradle/wrapper
 
-          # Set required wrapper version before Gradle configuration
           cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
@@ -223,7 +227,6 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-          # Generate wrapper scripts
           gradle wrapper \
             --gradle-version 9.3.1 \
             --distribution-type all
@@ -232,14 +235,17 @@ jobs:
 
           ./gradlew --version
 
-      # 11. Build signed Android App Bundle
+      # 12. Build signed Android App Bundle
       - name: Build signed Android App Bundle
+        shell: bash
         run: |
+          set -euo pipefail
+
           flutter build appbundle \
             --release \
             --build-number=${{ github.run_number }}
 
-      # 12. Verify generated AAB
+      # 13. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -247,7 +253,10 @@ jobs:
 
           AAB="build/app/outputs/bundle/release/app-release.aab"
 
-          test -s "$AAB"
+          if [ ! -s "$AAB" ]; then
+            echo "AAB file was not generated."
+            exit 1
+          fi
 
           echo "AAB successfully generated."
 
@@ -257,7 +266,7 @@ jobs:
 
           echo "AAB signature verification completed."
 
-      # 13. Upload signed AAB
+      # 14. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
