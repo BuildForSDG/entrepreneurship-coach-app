@@ -1,3 +1,4 @@
+
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -11,14 +12,17 @@ plugins {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 
-if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use {
-        keystoreProperties.load(it)
-    }
+require(keystorePropertiesFile.exists()) {
+    "Missing android/key.properties. Check your GitHub signing setup."
+}
+
+FileInputStream(keystorePropertiesFile).use {
+    keystoreProperties.load(it)
 }
 
 android {
     namespace = "com.gladstargtschool6.investlearn"
+
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -33,45 +37,47 @@ android {
 
     defaultConfig {
         applicationId = "com.gladstargtschool6.investlearn"
+
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                val storeFilePath =
-                    keystoreProperties.getProperty("storeFile")
-                        ?: error("Missing storeFile in key.properties")
+            storeFile = file(
+                keystoreProperties.getProperty("storeFile")
+                    ?: error("Missing storeFile")
+            )
 
-                keyAlias =
-                    keystoreProperties.getProperty("keyAlias")
-                        ?: error("Missing keyAlias in key.properties")
+            keyAlias =
+                keystoreProperties.getProperty("keyAlias")
+                    ?: error("Missing keyAlias")
 
-                keyPassword =
-                    keystoreProperties.getProperty("keyPassword")
-                        ?: error("Missing keyPassword in key.properties")
+            keyPassword =
+                keystoreProperties.getProperty("keyPassword")
+                    ?: error("Missing keyPassword")
 
-                storePassword =
-                    keystoreProperties.getProperty("storePassword")
-                        ?: error("Missing storePassword in key.properties")
-
-                storeFile = file(storeFilePath)
-            }
+            storePassword =
+                keystoreProperties.getProperty("storePassword")
+                    ?: error("Missing storePassword")
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig =
+                signingConfigs.getByName("release")
 
             isMinifyEnabled = true
             isShrinkResources = true
 
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
+                getDefaultProguardFile(
+                    "proguard-android-optimize.txt"
+                ),
                 "proguard-rules.pro"
             )
         }
