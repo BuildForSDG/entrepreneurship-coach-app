@@ -10,5 +10,5 @@ Future<void> main() async {
 
   await initializeFirebase();
 
-  runApp(const MyApp());
+  runApp(const EntrepreneurshipCoachApp());
 }
