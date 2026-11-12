@@ -27,53 +27,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 3. Set up Android SDK
+      # 3. Set up Android SDK and accept licences
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: |
+            platform-tools
+            platforms;android-35
+            platforms;android-36
+            build-tools;35.0.0
+            build-tools;36.0.0
 
-      # 4. Install Android SDK packages and accept licences
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-
-          SDKMANAGER="$(command -v sdkmanager)"
-
-          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
-            echo "Android SDK manager not found."
-            exit 1
-          fi
-
-          echo "Accepting Android SDK licences..."
-
-          set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses
-          LICENSE_STATUS=${PIPESTATUS[1]}
-          set -o pipefail
-
-          if [ "$LICENSE_STATUS" -ne 0 ]; then
-            echo "Android SDK licence acceptance failed."
-            exit 1
-          fi
-
-          echo "Installing Android SDK packages..."
-
-          "$SDKMANAGER" --sdk_root="$SDK" \
-            "cmdline-tools;latest" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "platforms;android-36" \
-            "build-tools;35.0.0" \
-            "build-tools;36.0.0"
-
-          echo "Android SDK installation completed."
-
-      # 5. Install Flutter
+      # 4. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -86,13 +53,13 @@ jobs:
           flutter --version
           flutter doctor -v
 
-      # 6. Set up Gradle 9.3.1
+      # 5. Set up Gradle 9.3.1
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      # 7. Configure Flutter and Android SDK paths
+      # 6. Configure Flutter and Android SDK paths
       - name: Configure Android local properties
         shell: bash
         run: |
@@ -109,11 +76,11 @@ jobs:
 
           echo "Android local.properties configured."
 
-      # 8. Resolve Flutter dependencies
+      # 7. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 9. Validate GitHub secrets
+      # 8. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -140,7 +107,7 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 10. Configure Android signing and Firebase
+      # 9. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -154,7 +121,7 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode existing upload keystore
+          # Decode existing keystore
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode > android/app/upload-keystore.jks
 
@@ -207,7 +174,7 @@ jobs:
 
           echo "Signing configuration completed."
 
-      # 11. Generate Gradle wrapper
+      # 10. Generate Gradle wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
@@ -235,7 +202,7 @@ jobs:
 
           ./gradlew --version
 
-      # 12. Build signed Android App Bundle
+      # 11. Build signed Android App Bundle
       - name: Build signed Android App Bundle
         shell: bash
         run: |
@@ -245,7 +212,7 @@ jobs:
             --release \
             --build-number=${{ github.run_number }}
 
-      # 13. Verify generated AAB
+      # 12. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -266,7 +233,7 @@ jobs:
 
           echo "AAB signature verification completed."
 
-      # 14. Upload signed AAB
+      # 13. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
