@@ -33,12 +33,7 @@ jobs:
         with:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
-          packages: |
-            platform-tools
-            platforms;android-35
-            platforms;android-36
-            build-tools;35.0.0
-            build-tools;36.0.0
+          packages: 'platform-tools,platforms;android-35,platforms;android-36,build-tools;35.0.0,build-tools;36.0.0'
 
       # 4. Install Flutter
       - name: Set up Flutter
@@ -48,18 +43,19 @@ jobs:
           channel: stable
           cache: true
 
+      # 5. Verify Flutter installation
       - name: Check Flutter installation
         run: |
           flutter --version
           flutter doctor -v
 
-      # 5. Set up Gradle 9.3.1
+      # 6. Set up Gradle 9.3.1
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      # 6. Configure Flutter and Android SDK paths
+      # 7. Configure Flutter and Android SDK paths
       - name: Configure Android local properties
         shell: bash
         run: |
@@ -76,11 +72,11 @@ jobs:
 
           echo "Android local.properties configured."
 
-      # 7. Resolve Flutter dependencies
+      # 8. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 8. Validate GitHub secrets
+      # 9. Validate GitHub secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -107,7 +103,7 @@ jobs:
 
           echo "All required secrets are available."
 
-      # 9. Configure Android signing and Firebase
+      # 10. Configure Android signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -121,7 +117,7 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode existing keystore
+          # Decode existing upload keystore
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode > android/app/upload-keystore.jks
 
@@ -174,7 +170,7 @@ jobs:
 
           echo "Signing configuration completed."
 
-      # 10. Generate Gradle wrapper
+      # 11. Generate Gradle wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
@@ -202,7 +198,7 @@ jobs:
 
           ./gradlew --version
 
-      # 11. Build signed Android App Bundle
+      # 12. Build signed Android App Bundle
       - name: Build signed Android App Bundle
         shell: bash
         run: |
@@ -212,7 +208,7 @@ jobs:
             --release \
             --build-number=${{ github.run_number }}
 
-      # 12. Verify generated AAB
+      # 13. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -233,7 +229,7 @@ jobs:
 
           echo "AAB signature verification completed."
 
-      # 13. Upload signed AAB
+      # 14. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
