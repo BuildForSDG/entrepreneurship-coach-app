@@ -176,21 +176,18 @@ jobs:
 
       # 8. Generate Gradle wrapper
       - name: Generate Gradle wrapper
-        shell: bash
-        run: |
-          set -euo pipefail
+   run: |
+    set -euo pipefail
 
-          cd android
+    cd android
 
-          if [ ! -f gradlew ]; then
-            gradle wrapper \
-              --gradle-version 8.14.3 \
-              --distribution-type all
-          fi
+    gradle wrapper \
+      --gradle-version 9.3.1 \
+      --distribution-type all
 
-          chmod +x gradlew
+    chmod +x gradlew
 
-          ./gradlew --version
+    ./gradlew --version
 
       # 9. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
