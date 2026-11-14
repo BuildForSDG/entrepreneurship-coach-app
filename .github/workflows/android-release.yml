@@ -1,3 +1,4 @@
+
 name: Build signed Android App Bundle
 
 on:
@@ -15,15 +16,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      # 2. Set up Java 21 (IMPORTANT FIX)
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
+          cache: gradle
 
+      # 3. Verify Java runtime
+      - name: Verify Java 21
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          java -version
+
+          echo "JAVA_HOME=$JAVA_HOME"
+
+          java -version 2>&1 | grep -q '21\.'
+
+          echo "Java 21 successfully configured."
+
+      # 4. Set up Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -31,6 +50,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
           packages: 'platform-tools platforms;android-35 platforms;android-36 build-tools;35.0.0 build-tools;36.0.0'
 
+      # 5. Set up Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -38,20 +58,24 @@ jobs:
           channel: stable
           cache: true
 
+      # 6. Verify Flutter
       - name: Check Flutter installation
         run: |
           flutter --version
           flutter doctor -v
 
+      # 7. Set up Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
 
+      # 8. Configure Android local properties
       - name: Configure Android local properties
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p android
 
           cat > android/local.properties <<EOF
@@ -60,8 +84,10 @@ jobs:
           EOF
 
           test -s android/local.properties
+
           echo "Android local properties configured."
 
+      # 9. Update Android Gradle configuration
       - name: Update Android Gradle configuration
         shell: bash
         run: |
@@ -94,7 +120,7 @@ jobs:
                   "Check android/settings.gradle.kts."
               )
 
-          # Remove external Kotlin plugin declaration.
+          # Remove external Kotlin Android plugin declaration.
           content = re.sub(
               r'^\s*id\("org\.jetbrains\.kotlin\.android"\).*?\n',
               '',
@@ -124,43 +150,53 @@ jobs:
 
           echo "Android Gradle configuration:"
           grep -E 'com.android.application|org.jetbrains.kotlin.android' "$SETTINGS" || true
+
           cat "$PROPERTIES"
 
+      # 10. Resolve Flutter dependencies
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # ========================================================
-      # STEP ADDED: GENERATE ANDROID LAUNCHER ICONS
-      # ========================================================
+      # 11. Generate Android launcher icons
       - name: Generate Android launcher icons
         shell: bash
         run: |
           set -euo pipefail
 
-          # 1. Run flutter_launcher_icons if configured
           if grep -q "flutter_launcher_icons" pubspec.yaml 2>/dev/null || [ -f "flutter_launcher_icons.yaml" ]; then
             echo "Running flutter_launcher_icons..."
-            dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons:main || true
+
+            dart run flutter_launcher_icons || \
+              flutter pub run flutter_launcher_icons:main || true
           fi
 
-          # 2. Fallback: Ensure default icons exist to prevent AAPT failure
+          # Fallback icon generation.
           if [ ! -f "android/app/src/main/res/mipmap-hdpi/ic_launcher.png" ]; then
-            echo "ic_launcher not found. Generating template fallback icons..."
+            echo "Generating fallback launcher icons..."
+
             flutter create --template=app /tmp/flutter_icon_template
+
             mkdir -p android/app/src/main/res
-            cp -r /tmp/flutter_icon_template/android/app/src/main/res/mipmap-* android/app/src/main/res/
+
+            cp -r /tmp/flutter_icon_template/android/app/src/main/res/mipmap-* \
+              android/app/src/main/res/
+
             rm -rf /tmp/flutter_icon_template
           fi
 
-          # 3. Create ic_launcher_round if required by AndroidManifest.xml
+          # Create round icons if required.
           for dir in android/app/src/main/res/mipmap-*; do
-            if [ -d "$dir" ] && [ -f "$dir/ic_launcher.png" ] && [ ! -f "$dir/ic_launcher_round.png" ]; then
+            if [ -d "$dir" ] && \
+               [ -f "$dir/ic_launcher.png" ] && \
+               [ ! -f "$dir/ic_launcher_round.png" ]; then
+
               cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
             fi
           done
 
           echo "Launcher icons verified."
 
+      # 12. Validate signing and Firebase secrets
       - name: Validate signing and Firebase secrets
         shell: bash
         env:
@@ -187,6 +223,7 @@ jobs:
 
           echo "All required secrets are available."
 
+      # 13. Configure signing and Firebase
       - name: Configure Android signing and Firebase
         shell: bash
         env:
@@ -200,13 +237,13 @@ jobs:
 
           mkdir -p android/app
 
-          # Decode existing Android keystore.
+          # Decode existing keystore.
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode > android/app/upload-keystore.jks
 
           test -s android/app/upload-keystore.jks
 
-          # Verify the existing alias and store password.
+          # Verify keystore.
           keytool -list \
             -keystore android/app/upload-keystore.jks \
             -storepass "$STORE_PASSWORD" \
@@ -214,11 +251,11 @@ jobs:
 
           echo "Keystore verified."
 
-          # Write Firebase configuration.
+          # Configure Firebase.
           printf '%s' "$GOOGLE_SERVICES_JSON" \
             > android/app/google-services.json
 
-          # Verify Firebase Android package name.
+          # Verify Firebase package name.
           python3 - <<'PY'
           import json
 
@@ -242,7 +279,7 @@ jobs:
           print("Firebase configuration verified.")
           PY
 
-          # Generate Android signing properties.
+          # Generate signing properties.
           cat > android/key.properties <<EOF
           storeFile=upload-keystore.jks
           keyAlias=$KEY_ALIAS
@@ -251,8 +288,10 @@ jobs:
           EOF
 
           test -s android/key.properties
+
           echo "Signing configuration completed."
 
+      # 14. Generate Gradle Wrapper
       - name: Generate Gradle Wrapper
         shell: bash
         run: |
@@ -280,12 +319,27 @@ jobs:
 
           ./gradlew --version
 
-      - name: Check Android Gradle configuration
+      # 15. Verify Gradle is running on Java 21
+      - name: Verify Gradle JVM
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Checking Android Gradle files..."
+          cd android
+
+          ./gradlew --stop
+
+          ./gradlew --version
+
+          ./gradlew help --no-daemon
+
+          echo "Gradle configuration verified."
+
+      # 16. Check Android Gradle configuration
+      - name: Check Android Gradle configuration
+        shell: bash
+        run: |
+          set -euo pipefail
 
           test -f android/settings.gradle.kts
           test -f android/app/build.gradle.kts
@@ -294,23 +348,33 @@ jobs:
           grep -q 'com.android.application' android/settings.gradle.kts
 
           if grep -q 'org.jetbrains.kotlin.android' android/settings.gradle.kts; then
-            echo "External Kotlin plugin must be removed for this migration."
+            echo "External Kotlin plugin must be removed."
             exit 1
           fi
 
           grep -q 'android.builtInKotlin=true' android/gradle.properties
 
-          echo "Basic Android Gradle checks passed."
+          echo "Android Gradle checks passed."
 
+      # 17. Build signed Android App Bundle
       - name: Build signed Android App Bundle
         shell: bash
         run: |
           set -euo pipefail
 
+          java -version
+
+          cd android
+
+          ./gradlew --stop
+
+          cd ..
+
           flutter build appbundle \
             --release \
             --build-number=${{ github.run_number }}
 
+      # 18. Verify generated AAB
       - name: Verify AAB
         shell: bash
         run: |
@@ -324,12 +388,14 @@ jobs:
           fi
 
           echo "AAB successfully generated."
+
           ls -lh "$AAB"
 
           jarsigner -verify "$AAB"
 
           echo "AAB signature verification completed."
 
+      # 19. Upload signed AAB
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
