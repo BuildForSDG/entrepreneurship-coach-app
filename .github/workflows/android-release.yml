@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set up Java 21 (IMPORTANT FIX)
+      # 2. Set up Java 21
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -157,44 +157,67 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      # 11. Generate Android launcher icons
+      # 11. Generate and validate Android launcher icons
       - name: Generate Android launcher icons
         shell: bash
         run: |
           set -euo pipefail
 
-          if grep -q "flutter_launcher_icons" pubspec.yaml 2>/dev/null || [ -f "flutter_launcher_icons.yaml" ]; then
-            echo "Running flutter_launcher_icons..."
+          echo "Checking launcher icon configuration..."
 
-            dart run flutter_launcher_icons || \
-              flutter pub run flutter_launcher_icons:main || true
+          test -f pubspec.yaml
+
+          # Verify source logo exists.
+          if [ ! -s "assets/icon/app_icon.png" ]; then
+            echo "ERROR: Gladstar GT School app icon is missing."
+            echo "Expected: assets/icon/app_icon.png"
+            exit 1
           fi
 
-          # Fallback icon generation.
-          if [ ! -f "android/app/src/main/res/mipmap-hdpi/ic_launcher.png" ]; then
-            echo "Generating fallback launcher icons..."
-
-            flutter create --template=app /tmp/flutter_icon_template
-
-            mkdir -p android/app/src/main/res
-
-            cp -r /tmp/flutter_icon_template/android/app/src/main/res/mipmap-* \
-              android/app/src/main/res/
-
-            rm -rf /tmp/flutter_icon_template
+          # Verify launcher icon dependency.
+          if ! grep -q "flutter_launcher_icons:" pubspec.yaml; then
+            echo "ERROR: flutter_launcher_icons is missing from pubspec.yaml."
+            exit 1
           fi
 
-          # Create round icons if required.
-          for dir in android/app/src/main/res/mipmap-*; do
-            if [ -d "$dir" ] && \
-               [ -f "$dir/ic_launcher.png" ] && \
-               [ ! -f "$dir/ic_launcher_round.png" ]; then
+          # Generate launcher icons.
+          echo "Generating Gladstar GT School launcher icons..."
 
-              cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+          dart run flutter_launcher_icons
+
+          # Verify generated Android launcher icons.
+          RES="android/app/src/main/res"
+
+          for density in \
+            mipmap-mdpi \
+            mipmap-hdpi \
+            mipmap-xhdpi \
+            mipmap-xxhdpi \
+            mipmap-xxxhdpi
+          do
+            ICON="$RES/$density/ic_launcher.png"
+
+            if [ ! -s "$ICON" ]; then
+              echo "ERROR: Missing launcher icon: $ICON"
+              exit 1
             fi
+
+            echo "Verified: $ICON"
           done
 
-          echo "Launcher icons verified."
+          # Verify adaptive icon XML.
+          if [ ! -s "$RES/mipmap-anydpi-v26/ic_launcher.xml" ]; then
+            echo "ERROR: Adaptive launcher icon XML is missing."
+            exit 1
+          fi
+
+          # Verify adaptive icon foreground.
+          if [ ! -s "$RES/drawable/ic_launcher_foreground.png" ] && \
+             [ ! -s "$RES/drawable-v24/ic_launcher_foreground.png" ]; then
+            echo "WARNING: Check adaptive icon foreground resource."
+          fi
+
+          echo "All launcher icon checks completed."
 
       # 12. Validate signing and Firebase secrets
       - name: Validate signing and Firebase secrets
@@ -319,7 +342,7 @@ jobs:
 
           ./gradlew --version
 
-      # 15. Verify Gradle is running on Java 21
+      # 15. Verify Gradle JVM
       - name: Verify Gradle JVM
         shell: bash
         run: |
