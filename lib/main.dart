@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'core/firebase/firebase_setup.dart';
 import 'app/app_theme.dart';
@@ -16,12 +17,12 @@ class EntrepreneurshipCoachApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Entrepreneurship Coach',
+      title: 'Gladstar GT School',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const Scaffold(
         body: Center(
-          child: Text('Entrepreneurship Coach App'),
+          child: Text('Gladstar GT School'),
         ),
       ),
     );
