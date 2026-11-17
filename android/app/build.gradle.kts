@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
@@ -72,8 +73,8 @@ extensions.configure<ApplicationExtension> {
         release {
             signingConfig = signingConfigs.getByName("release")
 
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
 
             proguardFiles(
                 getDefaultProguardFile(
@@ -82,10 +83,15 @@ extensions.configure<ApplicationExtension> {
                 "proguard-rules.pro"
             )
         }
+
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
     }
 }
 
-// AGP 9 built-in Kotlin compiler configuration
+// Kotlin compiler configuration
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -97,6 +103,7 @@ flutter {
     source = "../.."
 }
 
+// Dependencies
 dependencies {
     implementation("com.google.android.material:material:1.12.0")
 }
